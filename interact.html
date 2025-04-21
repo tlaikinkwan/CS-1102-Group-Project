@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Sentiment Analysis</title>
+  <link rel="stylesheet" href="style.css">
+  <header>
+     <h3>CS1102 Project (2024-2025 Sem B)</h3>
+        <h2>Project Group for Topic 3a</h2>
+        <h1>Public Opinion Analysis in the Era of Big Data</h1>
+        <div>
+            <nav>
+               <a href="CS1102_Text_File.pdf" target="_blank">Project Text File</a>
+               <a href="Video_Complete.MP4">Project Video</a>
+            </nav>
+            <br>
+        </div>
+        <div>
+            <hr>
+            <nav>
+                <a href="index.html">Introduction</a>
+                <a href="theories.html">Theories</a>
+                <a href="progressandchallenges.html">Progress & Challenges</a>
+                <a href="solutions.html">Our Solutions</a>
+                <a href="#" class="open">Sentiment Analysis</a>
+                <a href="references.html">References</a>
+            </nav>
+            <hr>
+        </div>
+    </header>
+  <script type="module">
+    import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+    const genAI = new GoogleGenerativeAI("YOUR API"); //PLEASE UPLOAD YOUR OWN API!
+
+    async function normalizeCommentWithLLM(rawComment) {
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+        const prompt = `
+You are helping with sentiment analysis. Convert any emojis and synonyms in the input into one of these keywords:
+- Positive: "love", "great"
+- Negative: "hate", "bad"
+
+Also normalize any emotional slang, abbreviations, or similar words. Only return the rewritten sentence, using only those 4 words and neutral filler text.
+
+Input: ${rawComment}`;
+
+        const result = await model.generateContent(prompt);
+        const text = await result.response.text();
+        console.log("Gemini API Response:", text);
+        return text.trim();
+      } catch (err) {
+        console.error("Gemini API error:", err);
+        return null;
+      }
+    }
+
+    window.analyzeSentiment = async function () {
+      const rawComment = prompt("Enter your comment", "I 💖 this CS1102 but 😤 the assignments!");
+      if (!rawComment) return;
+
+      const outputElement = document.getElementById("demo");
+      outputElement.innerText = "Processing...";
+
+      const comment = await normalizeCommentWithLLM(rawComment);
+
+      if (!comment) {
+        outputElement.innerText = "Error: Failed to process input with Gemini API.";
+        return;
+      }
+
+      console.log("Normalized:", comment);
+
+      // Count occurrences of keywords
+      const posMatches = comment.match(/\b(love|great)\b/g) || [];
+      const negMatches = comment.match(/\b(hate|bad)\b/g) || [];
+
+      let pos_sent = posMatches.length;
+      let neg_sent = negMatches.length;
+
+      // Handle special case for "but"
+      const butIndex = comment.indexOf("but");
+      if (butIndex !== -1) {
+        const beforeBut = comment.slice(0, butIndex);
+        const afterBut = comment.slice(butIndex + 3);
+
+        const posBefore = (beforeBut.match(/\b(love|great)\b/g) || []).length;
+        const negBefore = (beforeBut.match(/\b(hate|bad)\b/g) || []).length;
+        const posAfter = (afterBut.match(/\b(love|great)\b/g) || []).length;
+        const negAfter = (afterBut.match(/\b(hate|bad)\b/g) || []).length;
+
+        // Apply sentiment shift for "but"
+        if (posBefore > 0 && negAfter > 0) neg_sent++;
+        else if (negBefore > 0 && posAfter > 0) pos_sent++;
+      }
+
+      const sentimentScore = pos_sent + neg_sent === 0
+        ? 0
+        : (pos_sent - neg_sent) / (pos_sent + neg_sent);
+
+      outputElement.innerText =
+        `Normalized Comment: ${comment}\n\n` +
+        `Positive Sentiment: ${pos_sent}\n` +
+        `Negative Sentiment: ${neg_sent}\n` +
+        `Sentiment Score: ${sentimentScore.toFixed(2)}`;
+    };
+  </script>
+</head>
+<body>
+  <h2>Sentiment Analysis</h2>
+  <h3>A classical sentiment score method enhanced by Gemini LLM</h3>
+  <p>Click the button to enter your comment and analyze sentiment.</p>
+  <button onclick="analyzeSentiment()">Let's play</button>
+  <pre id="demo" style="white-space: pre-wrap; margin-top: 20px;"></pre>
+</body>
+</html>
